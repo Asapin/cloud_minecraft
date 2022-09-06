@@ -17,6 +17,10 @@ Using admin panel, you can also ban/unban, kick and whitelist players, as well a
 
 Admin panel is protected with login and password of your choice, to protect from unauthorized users accessing your server.
 
+## Backup
+
+If you want to make a backup of your Minecraft world, you should backup `/server/world` directory, or mount it on an external volume.
+
 ## Available environment variables:
 
 | Name | Default value | Description |
@@ -28,7 +32,7 @@ Admin panel is protected with login and password of your choice, to protect from
 | HARDCORE | false | Whether the hardcore mode is off or on |
 | MAX_PLAYERS | 10 | The maximum number of players that can play on the server at the same time |
 | MAX_WORLD_RADIUS | 1000 | The maximum possible world size in blocks, expressed as a radius. The actual world will be two times bigger than this value |
-| MOTD | `Minecraft on demand` | Message of the day |
+| MOTD | Minecraft on demand | Message of the day |
 | PLAYER_IDLE_TIMEOUT | 10 | If non-zero, players are kicked from the server if they are idle for more than that many minutes |
 | SERVER_IDLE_TIMEOUT | 10 | Server will automatically shutdown, if there are now players for more than that many minutes |
 | VIEW_DISTANCE | 10 | The amount of visible chunks in each direction |
