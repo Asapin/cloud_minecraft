@@ -1,0 +1,32 @@
+<!doctype html>
+<html style="height: 100%" lang="en-US">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft admin panel</title>
+
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+</head>
+
+<body>
+    <header>
+        <h1>Admin panel</h1>
+    </header>
+    <main style="margin: auto;">
+        <form method="post" action="/login">
+            <p>
+                <label for="username">Username</label>
+                <input type="text" name="username" placeholder="Username" required="required" />
+            </p>
+            <p>
+                <label for="password">Password</label>
+                <input type="password" name="password" placeholder="Password" required="required" />
+            </p>
+            <button style="width: 100%" type="submit">Login</button>
+        </form>
+    </main>
+</body>
+
+</html>

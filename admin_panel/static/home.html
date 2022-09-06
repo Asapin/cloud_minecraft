@@ -1,0 +1,314 @@
+<!doctype html>
+<html style="height: 100%" lang="en-US">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft admin panel</title>
+
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-toast-plugin/1.3.2/jquery.toast.min.js" integrity="sha512-zlWWyZq71UMApAjih4WkaRpikgY9Bz1oXIW5G0fED4vk14JjGlQ1UmkGM392jEULP8jbNMiwLWdM8Z87Hu88Fw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-toast-plugin/1.3.2/jquery.toast.min.css" integrity="sha512-wJgJNTBBkLit7ymC6vvzM1EcSWeM9mmOu+1USHaRBbHkm6W9EgM0HY27+UtUaprntaYQJF75rc8gjxllKs5OIQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        nav a.current {
+            color: var(--accent) !important;
+            border-color: var(--accent) !important;
+        }
+        .center {
+            margin: auto;
+            width: 0rem;
+        }
+        .offsetLeft {
+            width: max-content;
+            margin-left: -5rem;
+        }
+        #status {
+            width: 0.8rem;
+            height: 0.8rem;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .unknown {
+            background: red;
+        }
+        .preparing {
+            background: orange;
+        }
+        .online {
+            background: green;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Admin panel</h1>
+        <nav>
+            <a href="#" data-form="banForm">Ban</a>
+            <a href="#" data-form="kickForm">Kick</a>
+            <a href="#" data-form="whitelistForm">Whitelist</a>
+            <a href="#" data-form="genForm">Pre-generate world</a>
+        </nav>
+        <div class="center">
+            <div class="offsetLeft">
+                <div id="status" class="preparing"></div>
+                <span>Online: </span>
+                <span id="online">unknown</span>
+            </div>
+        </div>
+    </header>
+    <main style="margin: auto;">
+        <form id="banForm">
+            <p>
+                <label for="banNickname">Nickname</label>
+                <input type="text" name="banNickname" id="banNickname" placeholder="Nickname" required="required" />
+            </p>
+            <p>
+                <label for="banReason">Reason</label>
+                <input type="text" name="banReason" id="banReason" placeholder="Reason" />
+            </p>
+            <button id="ban">Ban</button>
+            <button id="unban">Unban</button>
+        </form>
+        <form id="kickForm">
+            <p>
+                <label for="kickNickname">Nickname</label>
+                <input type="text" name="kickNickname" id="kickNickname" placeholder="Nickname" required="required" />
+            </p>
+            <p>
+                <label for="kickReason">Reason</label>
+                <input type="text" name="kickReason" id="kickReason" placeholder="Reason" />
+            </p>
+            <button id="kick">Kick</button>
+        </form>
+        <form id="whitelistForm">
+            <p>
+                <label for="wlNickname">Nickname</label>
+                <input type="text" name="wlNickname" id="wlNickname" placeholder="Nickname" required="required" />
+            </p>
+            <button id="add">Add</button>
+            <button id="remove">Remove</button>
+        </form>
+        <form id="genForm">
+            <p>
+                <label for="genRadius">Radius</label>
+                <input type="number" name="genRadius" id="genRadius" min="128" max="30000" value="128" required="required" />
+            </p>
+            <button id="generate">Start pre-generation</button>
+            <button id="cancel">Cancel</button>
+        </form>
+    </main>
+    <script>
+        function successToast(msg) {
+            $.toast({
+                heading: 'Success',
+                text: msg,
+                icon: 'success',
+                showHideTransition: 'slide',
+                stack: 5,
+                position: 'top-right',
+                textAlign: 'left',
+            });
+        }
+
+        function warningToast(msg) {
+            $.toast({
+                heading: 'Warning',
+                text: msg,
+                icon: 'warning',
+                showHideTransition: 'slide',
+                stack: 5,
+                position: 'top-right',
+                textAlign: 'left',
+            });
+        }
+
+        function errorToast(msg) {
+            $.toast({
+                heading: 'Error',
+                text: msg,
+                icon: 'error',
+                showHideTransition: 'slide',
+                stack: 5,
+                position: 'top-right',
+                textAlign: 'left',
+            });
+        }
+
+        function send(url, type, data) {
+            $.ajax({
+                type: type,
+                url: url,
+                data: data,
+                contentType: "application/json",
+                dataType: "json",
+                success: function(data) {
+                    if (data.success === true) {
+                        if (data.response.Ok !== undefined && data.response.Ok != null) {
+                            successToast(data.response.Ok.response);
+                        } else if (data.response === "NotReady") {
+                            warningToast("Server is not ready yet");
+                        } else if (data.response.Err !== undefined && data.response.Err != null) {
+                            errorToast(data.response.Err.error);
+                        } else {
+                            warningToast("Unknown response code: " + data.response);
+                        }
+                    } else {
+                        errorToast(["Couldn't perform the action:", data.error]);
+                    }
+                },
+                error: errorHandler
+            });
+        }
+
+        function sendPing() {
+            $.ajax({
+                type: "GET",
+                url: "/ping",
+                dataType: "json",
+                timeout: 2000,
+                success: function(data) {
+                    if (data.success === true) {
+                        $("#status").removeClass();
+                        if (data.response.Ok !== undefined && data.response.Ok != null) {
+                            $("#status").addClass('online');
+                            $("#online").text(data.response.Ok.response);
+                        } else if (data.response === "NotReady") {
+                            $("#status").addClass('preparing');
+                            $("#online").text("preparing");
+                        } else {
+                            $("#status").addClass('unknown');
+                            $("#online").text("unknown");
+                        }
+                    } else {
+                        errorToast(["Couldn't ping the server: ", data.error]);
+                    }
+                },
+                error: function(jqXHR) {
+                    $("#status").removeClass();
+                    $("#status").addClass('unknown');
+                    $("#online").text("unknown");
+                }
+            });
+        }
+
+        let timer = setInterval(sendPing, 10000);
+
+        $("nav a").on("click", function() {
+            $("nav a").each(function() {
+                $(this).removeClass("current");
+            })
+
+            $("main form").each(function() {
+                $(this).hide();
+            })
+
+            $(this).addClass("current");
+            let formId = $(this).data("form");
+            $("#" + formId).show();
+        });
+
+        $("nav a").first().click();
+
+        let errorHandler = function(jqXHR) {
+            if (jqXHR.responseText) {
+                errorToast(["Error while sending the request to the server:", jqXHR.responseText]);
+            } else {
+                errorToast("Error while sending the request to the server");
+            }
+        };
+
+        $("#ban").on("click", function(event) {
+            if (!$("#banForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let nickname = $("#banNickname").val();
+            let reason = $("#banReason").val();
+            let data = JSON.stringify({
+                "nickname": nickname,
+                "reason": reason
+            });
+            send("/ban", "POST", data);
+        });
+
+        $("#unban").on("click", function(event) {
+            if (!$("#banForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let nickname = $("#banNickname").val();
+            let data = JSON.stringify({
+                "nickname": nickname,
+            });
+            send("/ban", "DELETE", data);
+        });
+
+        $("#kick").on("click", function(event) {
+            if (!$("#kickForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let nickname = $("#kickNickname").val();
+            let reason = $("#kickReason").val();
+            let data = JSON.stringify({
+                "nickname": nickname,
+                "reason": reason
+            });
+            send("/kick", "POST", data);
+        });
+
+        $("#add").on("click", function(event) {
+            if (!$("#whitelistForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let nickname = $("#wlNickname").val();
+            let data = JSON.stringify({
+                "nickname": nickname
+            });
+            send("/whitelist", "POST", data);
+        });
+
+        $("#remove").on("click", function(event) {
+            if (!$("#whitelistForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let nickname = $("#wlNickname").val();
+            let data = JSON.stringify({
+                "nickname": nickname,
+            });
+            send("/whitelist", "DELETE", data);
+        });
+
+        $("#generate").on("click", function(event) {
+            if (!$("#genForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let radius = parseInt($("#genRadius").val());
+            let data = JSON.stringify({
+                "radius": radius,
+            });
+            send("/generate", "POST", data);
+        });
+
+        $("#cancel").on("click", function(event) {
+            if (!$("#genForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+            send("/generate", "DELETE", null);
+        });
+    </script>
+</body>
+</html>
