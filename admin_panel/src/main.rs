@@ -1,4 +1,6 @@
+use std::fmt::Display;
 use std::io::Write;
+use std::num::{NonZeroU16, NonZeroU8};
 use std::{env::VarError, net::SocketAddr, path::Path, str::FromStr, sync::Arc, time::Duration};
 
 use axum::routing::delete;
@@ -7,6 +9,7 @@ use axum::{
     Extension, Router,
 };
 use controllers::{auth, protected};
+use error::DifficultyParserError;
 use log::{error, info, warn};
 use models::auth::Keys;
 use rand::RngCore;
@@ -32,16 +35,50 @@ pub struct Context {
     pub tx: Sender<(ProxyMessage, oneshot::Sender<ProxyResponse>)>,
 }
 
+enum Difficulty {
+    Peaceful,
+    Easy,
+    Normal,
+    Hard,
+}
+
+impl FromStr for Difficulty {
+    type Err = DifficultyParserError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let difficulty = match s.to_ascii_lowercase().as_str() {
+            "peaceful" => Difficulty::Peaceful,
+            "easy" => Difficulty::Easy,
+            "normal" => Difficulty::Normal,
+            "hard" => Difficulty::Hard,
+            _ => return Err(DifficultyParserError::Parse(s.to_string())),
+        };
+
+        Ok(difficulty)
+    }
+}
+
+impl Display for Difficulty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Difficulty::Peaceful => write!(f, "peaceful"),
+            Difficulty::Easy => write!(f, "easy"),
+            Difficulty::Normal => write!(f, "normal"),
+            Difficulty::Hard => write!(f, "hard"),
+        }
+    }
+}
+
 pub struct Environment {
     eula: bool,
-    difficulty: String,
+    difficulty: Difficulty,
     hardcore: bool,
-    max_players: usize,
-    max_world_radius: i32,
+    max_players: NonZeroU8,
+    max_world_radius: NonZeroU16,
     motd: String,
-    player_idle_timeout: u8,
-    server_idle_timeout: u8,
-    view_distance: u8,
+    player_idle_timeout: NonZeroU8,
+    server_idle_timeout: NonZeroU8,
+    view_distance: NonZeroU8,
     pvp: bool,
 }
 
@@ -56,6 +93,11 @@ async fn main() {
             return;
         }
     };
+
+    if username.is_empty() || password.is_empty() {
+        error!("Username and password must not be empty!");
+        return;
+    }
 
     let env = load_env();
     if !check_eula(&env) {
@@ -79,7 +121,7 @@ async fn main() {
     };
 
     info!("Starting proxy layer...");
-    let idle_timeout = Duration::from_secs(env.server_idle_timeout as u64 * 60);
+    let idle_timeout = Duration::from_secs(env.server_idle_timeout.get() as u64 * 60);
     let online_poller = match OnlinePoller::new().await {
         Ok(online_poller) => online_poller,
         Err(e) => {
@@ -148,15 +190,15 @@ fn load_credentials() -> Result<(String, String), VarError> {
 
 fn load_env() -> Environment {
     info!("Loading environment variables...");
-    let eula = get_env("EULA", true);
-    let difficulty = get_env("DIFFICULTY", "normal".to_owned());
+    let eula = get_env("EULA", false);
+    let difficulty = get_env("DIFFICULTY", Difficulty::Normal);
     let hardcore = get_env("HARDCORE", false);
-    let max_players = get_env("MAX_PLAYERS", 10);
-    let max_world_radius = get_env("MAX_WORLD_RADIUS", 1000);
+    let max_players = get_env("MAX_PLAYERS", NonZeroU8::new(10).unwrap());
+    let max_world_radius = get_env("MAX_WORLD_RADIUS", NonZeroU16::new(1000).unwrap());
     let motd = get_env("MOTD", "Minecraft on demand".to_owned());
-    let player_idle_timeout = get_env("PLAYER_IDLE_TIMEOUT", 10);
-    let server_idle_timeout = get_env("SERVER_IDLE_TIMEOUT", 10);
-    let view_distance = get_env("VIEW_DISTANCE", 10);
+    let player_idle_timeout = get_env("PLAYER_IDLE_TIMEOUT", NonZeroU8::new(10).unwrap());
+    let server_idle_timeout = get_env("SERVER_IDLE_TIMEOUT", NonZeroU8::new(10).unwrap());
+    let view_distance = get_env("VIEW_DISTANCE", NonZeroU8::new(10).unwrap());
     let pvp = get_env("PVP", false);
     Environment {
         eula,
@@ -177,7 +219,10 @@ fn get_env<T: FromStr>(key: &str, default: T) -> T {
         Ok(v) => match v.parse() {
             Ok(parsed) => parsed,
             Err(_) => {
-                warn!("<{}>=<{}>: couldn't parse value", key, &v);
+                warn!(
+                    "<{}>=<{}>: couldn't parse value, using default value",
+                    key, &v
+                );
                 default
             }
         },

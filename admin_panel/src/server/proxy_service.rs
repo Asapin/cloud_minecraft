@@ -1,6 +1,6 @@
 use std::{process::ExitStatus, time::Duration};
 
-use log::{error, info, warn, debug};
+use log::{debug, error, info, warn};
 use minecraft_client_rs::Client;
 use serde::Serialize;
 use tokio::{
@@ -255,9 +255,11 @@ impl ProxyService {
         self.send_command(command, true)
     }
 
-    fn send_command(&mut self, command: String, protect_from_spam: bool) -> Result<String, ProxyResponseError> {
-        info!("Checking spam protection. Last message was sent at: {:?}", &self.last_request_time);
-        info!("Elapsed since last message: {:?}", &self.last_request_time.elapsed());
+    fn send_command(
+        &mut self,
+        command: String,
+        protect_from_spam: bool,
+    ) -> Result<String, ProxyResponseError> {
         if protect_from_spam && self.last_request_time.elapsed() < Duration::from_secs(5) {
             return Err(ProxyResponseError::Spam);
         }

@@ -10,6 +10,12 @@ use tokio::sync::{mpsc::error::SendError, oneshot};
 use crate::server::proxy_service::{ProxyMessage, ProxyResponse};
 
 #[derive(Error, Debug)]
+pub enum DifficultyParserError {
+    #[error("Couldn't parse difficulty: {0}")]
+    Parse(String),
+}
+
+#[derive(Error, Debug)]
 pub enum LogInitError {
     #[error("Couldn't initialize logger config: {0}")]
     Config(#[from] ConfigErrors),
