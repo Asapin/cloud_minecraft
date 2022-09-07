@@ -29,7 +29,7 @@ If you want to make a backup of your Minecraft world, you should backup `/server
 | ADMIN_PASSWORD |   |   | Password to access admin panel |
 | EULA | `true`, `false` | `false` | Whether the user has accepted [Minecraft End User License Agreement](https://account.mojang.com/documents/minecraft_eula). Must be set to `true` in order to start the server |
 | DIFFICULTY | `peaceful`, `easy`, `normal`, `hard` | `normal` | The difficulty level of the server |
-| HARDCORE | `true`, `false` | false | Whether the hardcore mode is off or on |
+| HARDCORE | `true`, `false` | `false` | Whether the hardcore mode is off or on |
 | MAX_PLAYERS | 1-255 | 10 | The maximum number of players that can play on the server at the same time |
 | MAX_WORLD_RADIUS | 1-65535 | 1000 | The maximum possible radius of the world in blocks. The actual world will be two times bigger than this value |
 | MOTD |   | `Minecraft on demand` | Message of the day |
