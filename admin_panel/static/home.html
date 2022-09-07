@@ -137,21 +137,37 @@
             });
         }
 
-        function send(url, type, data) {
+        function send(url, type, data, ping) {
             $.ajax({
                 type: type,
                 url: url,
                 data: data,
                 contentType: "application/json",
                 dataType: "json",
+                timeout: 2000,
                 success: function(data) {
                     if (data.success === true) {
+                        $("#status").removeClass();
                         if (data.response.Ok !== undefined && data.response.Ok != null) {
-                            successToast(data.response.Ok.response);
+                            $("#status").addClass('online');
+                            if (ping) {
+                                $("#online").text(data.response.Ok.response);
+                            } else {
+                                successToast(data.response.Ok.response);
+                            }
                         } else if (data.response === "NotReady") {
-                            warningToast("Server is not ready yet");
+                            $("#status").addClass('preparing');
+                            $("#online").text("preparing");
+                            if (!ping) {
+                                warningToast("Server is not ready yet");
+                            }
                         } else if (data.response.Err !== undefined && data.response.Err != null) {
-                            errorToast(data.response.Err.error);
+                            $("#status").addClass('unknown');
+                            if (ping) {
+                                $("#online").text("unknown");
+                            } else {
+                                errorToast(data.response.Err.error);
+                            }
                         } else {
                             warningToast("Unknown response code: " + data.response);
                         }
@@ -163,38 +179,7 @@
             });
         }
 
-        function sendPing() {
-            $.ajax({
-                type: "GET",
-                url: "/ping",
-                dataType: "json",
-                timeout: 2000,
-                success: function(data) {
-                    if (data.success === true) {
-                        $("#status").removeClass();
-                        if (data.response.Ok !== undefined && data.response.Ok != null) {
-                            $("#status").addClass('online');
-                            $("#online").text(data.response.Ok.response);
-                        } else if (data.response === "NotReady") {
-                            $("#status").addClass('preparing');
-                            $("#online").text("preparing");
-                        } else {
-                            $("#status").addClass('unknown');
-                            $("#online").text("unknown");
-                        }
-                    } else {
-                        errorToast(["Couldn't ping the server: ", data.error]);
-                    }
-                },
-                error: function(jqXHR) {
-                    $("#status").removeClass();
-                    $("#status").addClass('unknown');
-                    $("#online").text("unknown");
-                }
-            });
-        }
-
-        let timer = setInterval(sendPing, 10000);
+        let timer = setInterval(function() { send("/ping", "GET", null, true) }, 10000);
 
         $("nav a").on("click", function() {
             $("nav a").each(function() {
@@ -213,10 +198,16 @@
         $("nav a").first().click();
 
         let errorHandler = function(jqXHR) {
+            $("#status").removeClass();
+            $("#status").addClass('unknown');
+            $("#online").text("unknown");
             if (jqXHR.responseText) {
                 errorToast(["Error while sending the request to the server:", jqXHR.responseText]);
             } else {
                 errorToast("Error while sending the request to the server");
+            }
+            if (jqXHR.status === 401) {
+                window.location = '/';
             }
         };
 
@@ -232,7 +223,7 @@
                 "nickname": nickname,
                 "reason": reason
             });
-            send("/ban", "POST", data);
+            send("/ban", "POST", data, false);
         });
 
         $("#unban").on("click", function(event) {
@@ -245,7 +236,7 @@
             let data = JSON.stringify({
                 "nickname": nickname,
             });
-            send("/ban", "DELETE", data);
+            send("/ban", "DELETE", data, false);
         });
 
         $("#kick").on("click", function(event) {
@@ -260,7 +251,7 @@
                 "nickname": nickname,
                 "reason": reason
             });
-            send("/kick", "POST", data);
+            send("/kick", "POST", data, false);
         });
 
         $("#add").on("click", function(event) {
@@ -273,7 +264,7 @@
             let data = JSON.stringify({
                 "nickname": nickname
             });
-            send("/whitelist", "POST", data);
+            send("/whitelist", "POST", data, false);
         });
 
         $("#remove").on("click", function(event) {
@@ -286,7 +277,7 @@
             let data = JSON.stringify({
                 "nickname": nickname,
             });
-            send("/whitelist", "DELETE", data);
+            send("/whitelist", "DELETE", data, false);
         });
 
         $("#generate").on("click", function(event) {
@@ -299,7 +290,7 @@
             let data = JSON.stringify({
                 "radius": radius,
             });
-            send("/generate", "POST", data);
+            send("/generate", "POST", data, false);
         });
 
         $("#cancel").on("click", function(event) {
@@ -307,7 +298,7 @@
                 return;
             }
             event.preventDefault();
-            send("/generate", "DELETE", null);
+            send("/generate", "DELETE", null, false);
         });
     </script>
 </body>
