@@ -109,8 +109,6 @@ pub enum ProxyResponseError {
     McServerAuth(Box<dyn Error>),
     #[error("Couldn't send command to MC server: {0}")]
     McServerCommand(Box<dyn Error>),
-    #[error("Couldn't shutdown MC server: {0}")]
-    McShutdown(io::Error),
 }
 
 impl From<ProxyResponse> for ProxyResponseError {

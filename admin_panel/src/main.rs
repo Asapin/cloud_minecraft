@@ -17,7 +17,7 @@ use server::online_poller::OnlinePoller;
 use server::proxy_service::{ProxyMessage, ProxyResponse, ProxyService};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot;
+use tokio::sync::oneshot::{self, channel};
 use tower_http::cors::{Any, CorsLayer};
 
 mod controllers;
@@ -112,7 +112,7 @@ async fn main() {
         }
     }
 
-    let server = match start_server() {
+    let mut server = match start_server() {
         Ok(server_process) => server_process,
         Err(e) => {
             error!("Couldn't start Minecraft server: {}", &e);
@@ -130,7 +130,7 @@ async fn main() {
         }
     };
 
-    let (proxy_service, tx) = ProxyService::new(server, online_poller, idle_timeout);
+    let (proxy_service, tx) = ProxyService::new(online_poller, idle_timeout);
     let proxy_task = tokio::spawn(proxy_service.run());
 
     info!("Starting web server...");
@@ -158,12 +158,30 @@ async fn main() {
         .route("/generate", delete(protected::cancel_generation))
         .route("/ping", get(protected::server_status))
         .layer(CorsLayer::new().allow_origin(Any))
-        .layer(Extension(context));
+        .layer(Extension(context.clone()));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     let result = axum::Server::bind(&addr)
         .serve(router.into_make_service())
         .with_graceful_shutdown(async {
+            // If MC server has crashed, proxy service will not be able to detect it.
+            // Instead, we can await on MC server's process directly, and manually stop
+            // proxy service, in case of a crash.
+            match server.wait().await {
+                Ok(r) => info!("MC server exit code: {}", &r),
+                Err(e) => error!("Error while shutting down MC server: {}", &e),
+            }
+
+            // During the normal operation, proxy service will close before MC server,
+            // so attempting to send a message to it will return an error
+            let (rx, _) = channel();
+            match context.tx.send((ProxyMessage::Quit, rx)).await {
+                Ok(_r) => {}
+                Err(_e) => warn!("Proxy is closed"),
+            }
+
+            // If the server closed normally, proxy_task will return immediately.
+            // In case of MC server crash, await for proxy service to process `Quit` message
             match proxy_task.await {
                 Ok(_r) => {}
                 Err(e) => {

@@ -1,10 +1,9 @@
-use std::{process::ExitStatus, time::Duration};
+use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use minecraft_client_rs::Client;
 use serde::Serialize;
 use tokio::{
-    process::Child,
     sync::{
         mpsc::{channel, Receiver, Sender},
         oneshot,
@@ -40,6 +39,7 @@ pub enum ProxyMessage {
     },
     CancelGeneration,
     Ping,
+    Quit,
 }
 
 #[derive(Debug, Serialize)]
@@ -56,7 +56,6 @@ enum ServerStatus {
 }
 
 pub struct ProxyService {
-    server: Child,
     online_poller: OnlinePoller,
     status: ServerStatus,
     idle_timeout: Duration,
@@ -67,7 +66,6 @@ pub struct ProxyService {
 
 impl ProxyService {
     pub fn new(
-        server: Child,
         online_poller: OnlinePoller,
         idle_timeout: Duration,
     ) -> (Self, Sender<(ProxyMessage, oneshot::Sender<ProxyResponse>)>) {
@@ -75,7 +73,6 @@ impl ProxyService {
         let (tx, rx) = channel(16);
         (
             Self {
-                server,
                 online_poller,
                 status,
                 idle_timeout,
@@ -94,7 +91,7 @@ impl ProxyService {
         };
         info!("Shutting down MC server...");
         match self.shutdown().await {
-            Ok(r) => info!("MC server exit code: {}", &r),
+            Ok(_r) => {}
             Err(e) => error!("Error while shutting down MC server: {}", &e),
         };
     }
@@ -128,6 +125,12 @@ impl ProxyService {
                         ProxyMessage::GenerateWorld { radius } => self.generate_world(radius),
                         ProxyMessage::CancelGeneration => self.cancel_generation(),
                         ProxyMessage::Ping => Ok(self.current_online.to_string()),
+                        ProxyMessage::Quit => {
+                            warn!(
+                                "MC server closed before proxy server. Possible MC server crash?"
+                            );
+                            return Ok(());
+                        }
                     };
 
                     match response {
@@ -192,13 +195,10 @@ impl ProxyService {
         }
     }
 
-    async fn shutdown(mut self) -> Result<ExitStatus, ProxyResponseError> {
+    async fn shutdown(mut self) -> Result<(), ProxyResponseError> {
         let command = "/stop".to_string();
         let _ = self.send_command(command, false)?;
-        self.server
-            .wait()
-            .await
-            .map_err(ProxyResponseError::McShutdown)
+        Ok(())
     }
 
     fn ban(
