@@ -2,6 +2,8 @@
 
 This is a Minecraft server packed as a Docker image. This project is inspired by [Minecraft on demand](https://github.com/doctorray117/minecraft-ondemand) from doctorray117, but simplifies the process for the end user by providing a simple admin panel, that will automatically shut down the server when it's idle for too long.
 
+In theory, admin panel can be used with any Minecraft server, but it does assume, that the server has "Chunky" mod installed and `fabric-server-launch.jar` is available.
+
 ## Exposed ports
 
 This image exposes the following ports:
