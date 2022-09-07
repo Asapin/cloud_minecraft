@@ -11,9 +11,9 @@ This image exposes the following ports:
 
 ## Admin panel
 
-When you start admin panel, it will check if the user has accepted Minecraft EULA, create `server.properties` file with provided settings and will start Minecraft server using [Aikar's flags](https://aikar.co/2018/07/02/tuning-the-jvm-g1gc-garbage-collector-flags-for-minecraft/).
+This docker container includes a simple admin panel, that allows you to ban/unban players, kick players off the server, add/remove players from the whitelist and start/cancel world pre-generation. It also shows current server status and the number of players on the server. The admin panel will also validate server settings, as well as keep track of the number of players online, and will shutdown the server if it's been idle for too long.
 
-Using admin panel, you can also ban/unban, kick and whitelist players, as well as start/cancel world generation. It also shows current status of the server and number of players on the server.
+When starting Minecraft server, it will use [Aikar's flags](https://aikar.co/2018/07/02/tuning-the-jvm-g1gc-garbage-collector-flags-for-minecraft/).
 
 Admin panel is protected with login and password of your choice, to protect from unauthorized users accessing your server.
 
