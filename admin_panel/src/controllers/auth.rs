@@ -51,7 +51,8 @@ pub async fn login_post(
 
     let mut jwt = Cookie::new("jwt", token);
     jwt.set_http_only(true);
-    jwt.set_secure(true);
+    // Enable back when implement getting cert from some provider
+    // jwt.set_secure(true);
     jwt.set_max_age(max_age);
     jwt.set_same_site(SameSite::Strict);
     let cookie_jar = jar.add(jwt);

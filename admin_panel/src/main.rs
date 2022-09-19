@@ -234,7 +234,7 @@ fn load_env() -> Environment {
 
 fn get_env<T: FromStr>(key: &str, default: T) -> T {
     match std::env::var(key) {
-        Ok(v) => match v.parse() {
+        Ok(v) => match v.to_ascii_lowercase().parse() {
             Ok(parsed) => parsed,
             Err(_) => {
                 warn!(
