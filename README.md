@@ -8,7 +8,7 @@ In theory, admin panel can be used with any Minecraft server, but it does assume
 
 This image exposes the following ports:
 
-* `8080` - Admin panel port. You need to publish this port in order to connect to the admin panel
+* `80` - Admin panel port. You need to publish this port in order to connect to the admin panel
 * `25565` - Server port. You need to publish this port in order to connect to the game server
 
 ## Admin panel

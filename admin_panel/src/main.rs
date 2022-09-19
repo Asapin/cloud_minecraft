@@ -160,7 +160,7 @@ async fn main() {
         .layer(CorsLayer::new().allow_origin(Any))
         .layer(Extension(context.clone()));
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 80));
     let result = axum::Server::bind(&addr)
         .serve(router.into_make_service())
         .with_graceful_shutdown(async {
