@@ -17,7 +17,7 @@ ENV EULA="" DIFFICULTY="" HARDCORE="" MAX_PLAYERS="" MAX_WORLD_RADIUS="" MOTD=""
 
 # Expose admin panel and game server
 EXPOSE 80/tcp
-EXPOSE 25565/udp
+EXPOSE 25565/tcp
 
 WORKDIR /server
 
