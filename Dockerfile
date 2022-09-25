@@ -11,6 +11,9 @@ RUN cargo install --path .
 # Start Minecraft server
 FROM eclipse-temurin:18-jre-jammy
 
+WORKDIR /server
+VOLUME [ "/data" ]
+
 # Environment variables used by this image
 ENV ADMIN_USERNAME="" ADMIN_PASSWORD=""
 ENV EULA="" DIFFICULTY="" HARDCORE="" MAX_PLAYERS="" MAX_WORLD_RADIUS="" MOTD="" PLAYER_IDLE_TIMEOUT="" SERVER_IDLE_TIMEOUT="" VIEW_DISTANCE="" PVP=""
@@ -18,8 +21,6 @@ ENV EULA="" DIFFICULTY="" HARDCORE="" MAX_PLAYERS="" MAX_WORLD_RADIUS="" MOTD=""
 # Expose admin panel and game server
 EXPOSE 80/tcp
 EXPOSE 25565/tcp
-
-WORKDIR /server
 
 # Copy admin panel
 COPY --from=builder --chmod=755 /usr/local/cargo/bin/admin_panel admin_panel

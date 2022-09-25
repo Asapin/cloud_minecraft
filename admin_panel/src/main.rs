@@ -1,7 +1,6 @@
-use std::fmt::Display;
-use std::io::Write;
-use std::num::{NonZeroU16, NonZeroU8};
-use std::{env::VarError, net::SocketAddr, path::Path, str::FromStr, sync::Arc, time::Duration};
+use std::fs::read_dir;
+use std::path::PathBuf;
+use std::{env::VarError, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::routing::delete;
 use axum::{
@@ -9,7 +8,7 @@ use axum::{
     Extension, Router,
 };
 use controllers::{auth, protected};
-use error::DifficultyParserError;
+use fs_extra::dir::CopyOptions;
 use log::{error, info, warn};
 use models::auth::Keys;
 use rand::RngCore;
@@ -20,13 +19,14 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::{self, channel};
 use tower_http::cors::{Any, CorsLayer};
 
+use crate::env::Environment;
+
 mod controllers;
+mod env;
 mod error;
 mod logger;
 mod models;
 mod server;
-
-static SERVER_PROPERTIES: &str = include_str!("../static/server.properties");
 
 pub struct Context {
     pub username: String,
@@ -35,56 +35,17 @@ pub struct Context {
     pub tx: Sender<(ProxyMessage, oneshot::Sender<ProxyResponse>)>,
 }
 
-enum Difficulty {
-    Peaceful,
-    Easy,
-    Normal,
-    Hard,
-}
-
-impl FromStr for Difficulty {
-    type Err = DifficultyParserError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let difficulty = match s.to_ascii_lowercase().as_str() {
-            "peaceful" => Difficulty::Peaceful,
-            "easy" => Difficulty::Easy,
-            "normal" => Difficulty::Normal,
-            "hard" => Difficulty::Hard,
-            _ => return Err(DifficultyParserError::Parse(s.to_string())),
-        };
-
-        Ok(difficulty)
-    }
-}
-
-impl Display for Difficulty {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Difficulty::Peaceful => write!(f, "peaceful"),
-            Difficulty::Easy => write!(f, "easy"),
-            Difficulty::Normal => write!(f, "normal"),
-            Difficulty::Hard => write!(f, "hard"),
-        }
-    }
-}
-
-pub struct Environment {
-    eula: bool,
-    difficulty: Difficulty,
-    hardcore: bool,
-    max_players: NonZeroU8,
-    max_world_radius: NonZeroU16,
-    motd: String,
-    player_idle_timeout: NonZeroU8,
-    server_idle_timeout: NonZeroU8,
-    view_distance: NonZeroU8,
-    pvp: bool,
-}
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     logger::init_logger().expect("Couldn't create logger, shutting down...");
+
+    match recreate_symlinks() {
+        Ok(_r) => {}
+        Err(e) => {
+            error!("Couldn't recreate symlinks: {}", &e);
+            return;
+        }
+    }
 
     let (username, password) = match load_credentials() {
         Ok((u, p)) => (u, p),
@@ -99,12 +60,12 @@ async fn main() {
         return;
     }
 
-    let env = load_env();
-    if !check_eula(&env) {
+    let env = Environment::load();
+    if !env.eula_accepted() {
         return;
     }
 
-    match check_server_parameters(&env) {
+    match env.save_server_parameters() {
         Ok(_r) => {}
         Err(e) => {
             error!("Couldn't check server parameters: {}", &e);
@@ -171,24 +132,26 @@ async fn main() {
                 Ok(r) => info!("MC server exit code: {}", &r),
                 Err(e) => error!("Error while shutting down MC server: {}", &e),
             }
-
             // During the normal operation, proxy service will close before MC server,
             // so attempting to send a message to it will return an error
             let (rx, _) = channel();
             match context.tx.send((ProxyMessage::Quit, rx)).await {
                 Ok(_r) => {}
-                Err(_e) => warn!("Proxy is closed"),
+                Err(_e) => info!("Proxy is closed"),
             }
-
             // If the server closed normally, proxy_task will return immediately.
             // In case of MC server crash, await for proxy service to process `Quit` message
             match proxy_task.await {
                 Ok(_r) => {}
-                Err(e) => {
-                    error!("Error while waiting for proxy layer to shutdown: {}", &e);
-                }
+                Err(e) => error!("Error while waiting for proxy layer to shutdown: {}", &e),
             };
-
+            // Move all files from `/server` to `/data` directory. Upon the next launch, the server will
+            // create symlinks to these dirs and files, so from that point on Fabric and Minecraft server
+            // will write to `/data` directory directly.
+            match backup_files() {
+                Ok(_r) => {}
+                Err(e) => error!("Error while backuping server files: {}", &e),
+            }
             info!("Closing web server...");
         })
         .await;
@@ -206,98 +169,93 @@ fn load_credentials() -> Result<(String, String), VarError> {
     Ok((username, password))
 }
 
-fn load_env() -> Environment {
-    info!("Loading environment variables...");
-    let eula = get_env("EULA", false);
-    let difficulty = get_env("DIFFICULTY", Difficulty::Normal);
-    let hardcore = get_env("HARDCORE", false);
-    let max_players = get_env("MAX_PLAYERS", NonZeroU8::new(10).unwrap());
-    let max_world_radius = get_env("MAX_WORLD_RADIUS", NonZeroU16::new(1000).unwrap());
-    let motd = get_env("MOTD", "Minecraft on demand".to_owned());
-    let player_idle_timeout = get_env("PLAYER_IDLE_TIMEOUT", NonZeroU8::new(10).unwrap());
-    let server_idle_timeout = get_env("SERVER_IDLE_TIMEOUT", NonZeroU8::new(10).unwrap());
-    let view_distance = get_env("VIEW_DISTANCE", NonZeroU8::new(10).unwrap());
-    let pvp = get_env("PVP", false);
-    Environment {
-        eula,
-        difficulty,
-        hardcore,
-        max_players,
-        max_world_radius,
-        motd,
-        player_idle_timeout,
-        server_idle_timeout,
-        view_distance,
-        pvp,
-    }
-}
-
-fn get_env<T: FromStr>(key: &str, default: T) -> T {
-    match std::env::var(key) {
-        Ok(v) => match v.to_ascii_lowercase().parse() {
-            Ok(parsed) => parsed,
-            Err(_) => {
-                warn!(
-                    "<{}>=<{}>: couldn't parse value, using default value",
-                    key, &v
-                );
-                default
-            }
-        },
-        Err(e) => {
-            warn!("<{}>: couldn't get value: {}", key, &e);
-            default
+fn recreate_symlinks() -> Result<(), std::io::Error> {
+    info!("Recreating symlinks...");
+    for path in read_dir("/data")? {
+        let entry = path?;
+        let file_name = entry.file_name();
+        let file_name = file_name.to_string_lossy();
+        if file_name == "world" {
+            continue;
+        }
+        let file_type = entry.file_type()?;
+        let counter_part = format!("/server/{}", &file_name);
+        if file_type.is_dir() {
+            symlink_dir(&entry.path(), &counter_part)?;
+        } else if file_type.is_file() {
+            symlink_file(&entry.path(), &counter_part)?;
+        } else {
+            warn!("{} is a symlink", &entry.path().to_string_lossy());
         }
     }
-}
-
-fn check_eula(environment: &Environment) -> bool {
-    info!("Checking EULA...");
-    let eula_path = Path::new("./eula.txt");
-    if eula_path.exists() {
-        return true;
-    }
-
-    if environment.eula {
-        info!("eula.txt doesn't exist, creating...");
-        match std::fs::write(&eula_path, "eula=true") {
-            Ok(_r) => true,
-            Err(e) => {
-                error!("Couldn't create eula.txt: {}", &e);
-                false
-            }
-        }
-    } else {
-        warn!("You need to accept Minecraft End User License Agreement");
-        warn!("at https://account.mojang.com/documents/minecraft_eula");
-        warn!("by setting <EULA> environment variably to <true>");
-        false
-    }
-}
-
-fn check_server_parameters(environment: &Environment) -> Result<(), std::io::Error> {
-    info!("Checking server.properties...");
-    let properties_path = Path::new("./server.properties");
-    if properties_path.exists() {
-        return Ok(());
-    }
-
-    info!("server.properties doesn't exist, creating...");
-    let mut file = std::fs::File::create(&properties_path)?;
-    writeln!(file, "{}", SERVER_PROPERTIES)?;
-    writeln!(file, "difficulty={}", &environment.difficulty)?;
-    writeln!(file, "hardcore={}", &environment.hardcore)?;
-    writeln!(file, "max-players={}", &environment.max_players)?;
-    writeln!(file, "max-world-size={}", &environment.max_world_radius)?;
-    writeln!(file, "motd={}", &environment.motd)?;
-    writeln!(
-        file,
-        "player-idle-timeout={}",
-        &environment.player_idle_timeout
-    )?;
-    writeln!(file, "view-distance={}", &environment.view_distance)?;
-    writeln!(file, "pvp={}", &environment.pvp)?;
     Ok(())
+}
+
+#[cfg(target_family = "unix")]
+fn symlink_file(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+    info!(
+        "Linking files, from <{}> to <{}>",
+        original.to_string_lossy(),
+        link
+    );
+    std::os::unix::fs::symlink(original, link)
+}
+
+#[cfg(target_family = "windows")]
+fn symlink_file(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+    info!(
+        "Linking files, from <{}> to <{}>",
+        original.to_string_lossy(),
+        link
+    );
+    std::os::windows::fs::symlink_file(original, link)
+}
+
+#[cfg(target_family = "unix")]
+fn symlink_dir(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+    info!(
+        "Linking dirs, from <{}> to <{}>",
+        original.to_string_lossy(),
+        link
+    );
+    std::os::unix::fs::symlink(original, link)
+}
+
+#[cfg(target_family = "windows")]
+fn symlink_dir(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+    info!(
+        "Linking dirs, from <{}> to <{}>",
+        original.to_string_lossy(),
+        link
+    );
+    std::os::windows::fs::symlink_dir(original, link)
+}
+
+fn backup_files() -> Result<(), std::io::Error> {
+    info!("Backing up server files...");
+    let mut paths = Vec::new();
+    for path in read_dir("/server")? {
+        let entry = path?;
+        let file_name = entry.file_name();
+        let file_name = file_name.to_string_lossy();
+        if file_name == "config"
+            || file_name == "mods"
+            || file_name == "fabric-server-launch.jar"
+            || file_name == "admin_panel"
+            || file_name == "logs"
+        {
+            continue;
+        }
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        paths.push(entry.path());
+    }
+    let copy_options = CopyOptions::new();
+    fs_extra::move_items(&paths, "/data", &copy_options)
+        .map(|_r| ())
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 }
 
 fn start_server() -> Result<Child, std::io::Error> {
