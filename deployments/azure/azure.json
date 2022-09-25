@@ -1,0 +1,338 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.10.61.36676",
+      "templateHash": "7103395263493883245"
+    }
+  },
+  "parameters": {
+    "storageName": {
+      "type": "string",
+      "metadata": {
+        "description": "Provide a name for the storage account. Use only lower case letters and numbers. The name must be unique across Azure."
+      },
+      "maxLength": 24,
+      "minLength": 3
+    },
+    "serverName": {
+      "type": "string",
+      "metadata": {
+        "description": "Provide a server name for Minecraft server. The address of the server will be \"{server_name}.{region}.azurecontainer.io\""
+      },
+      "minLength": 3
+    },
+    "imageName": {
+      "type": "string",
+      "defaultValue": "asapin/cloud_minecraft:1.19.2-fabric",
+      "metadata": {
+        "description": "Which version of Minecraft server you want to deploy"
+      },
+      "allowedValues": [
+        "asapin/cloud_minecraft:1.19.2-fabric",
+        "asapin/cloud_minecraft:1.19.2-better-mc",
+        "asapin/cloud_minecraft:1.19.2-medieval-mc"
+      ]
+    },
+    "cpu": {
+      "type": "int",
+      "defaultValue": 2,
+      "metadata": {
+        "description": "CPU limit"
+      },
+      "maxValue": 4,
+      "minValue": 1
+    },
+    "memory": {
+      "type": "int",
+      "defaultValue": 4,
+      "metadata": {
+        "description": "Memory limit in GB"
+      },
+      "maxValue": 8,
+      "minValue": 1
+    },
+    "adminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Username for the admin panel"
+      }
+    },
+    "adminPassword": {
+      "type": "secureString",
+      "metadata": {
+        "description": "Password for the admin panel"
+      }
+    },
+    "eula": {
+      "type": "bool",
+      "metadata": {
+        "description": "Whether you accept Minecraft EULA or not. Must be set to true to start the server"
+      }
+    },
+    "difficulty": {
+      "type": "string",
+      "defaultValue": "normal",
+      "metadata": {
+        "description": "Server difficulty"
+      },
+      "allowedValues": [
+        "peaceful",
+        "easy",
+        "normal",
+        "hard"
+      ]
+    },
+    "hardcore": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether the hardcore mode is on or off"
+      }
+    },
+    "maxPlayers": {
+      "type": "int",
+      "defaultValue": 10,
+      "metadata": {
+        "description": "The maximum number of players that can on the server at the same time"
+      },
+      "maxValue": 255,
+      "minValue": 1
+    },
+    "maxWorldRadius": {
+      "type": "int",
+      "defaultValue": 1000,
+      "metadata": {
+        "description": "The maximum possible radius of the world in blocks. The actual world will be two times bigger than this value"
+      },
+      "maxValue": 65535,
+      "minValue": 128
+    },
+    "motd": {
+      "type": "string",
+      "defaultValue": "Minecraft on demand",
+      "metadata": {
+        "description": "Message of the day"
+      }
+    },
+    "playerIdleTimeout": {
+      "type": "int",
+      "defaultValue": 10,
+      "metadata": {
+        "description": "Players are kicked from the server if they are idle for more than that many minutes"
+      },
+      "maxValue": 255,
+      "minValue": 1
+    },
+    "serverIdleTimeout": {
+      "type": "int",
+      "defaultValue": 10,
+      "metadata": {
+        "description": "Server will automatically shutdown, if there are now players for more than that many minutes"
+      },
+      "maxValue": 255,
+      "minValue": 1
+    },
+    "viewDistance": {
+      "type": "int",
+      "defaultValue": 10,
+      "metadata": {
+        "description": "The amount of visible chunks in each direction"
+      },
+      "maxValue": 255,
+      "minValue": 1
+    },
+    "pvp": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable PvP on the server"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2022-05-01",
+      "name": "[parameters('storageName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false,
+        "allowCrossTenantReplication": false,
+        "allowedCopyScope": "AAD",
+        "allowSharedKeyAccess": true,
+        "defaultToOAuthAuthentication": false,
+        "isHnsEnabled": true,
+        "isLocalUserEnabled": false,
+        "isNfsV3Enabled": false,
+        "isSftpEnabled": false,
+        "largeFileSharesState": "Disabled",
+        "minimumTlsVersion": "TLS1_2",
+        "routingPreference": {
+          "publishInternetEndpoints": false,
+          "publishMicrosoftEndpoints": false,
+          "routingChoice": "MicrosoftRouting"
+        },
+        "supportsHttpsTrafficOnly": true
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/fileServices",
+      "apiVersion": "2022-05-01",
+      "name": "[format('{0}/{1}', parameters('storageName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
+      "apiVersion": "2022-05-01",
+      "name": "[format('{0}/{1}/{2}', parameters('storageName'), 'default', 'world-data')]",
+      "properties": {
+        "accessTier": "Hot",
+        "shareQuota": 5
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('storageName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.ContainerInstance/containerGroups",
+      "apiVersion": "2021-10-01",
+      "name": "mc-container",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "containers": [
+          {
+            "name": "mc-server",
+            "properties": {
+              "image": "[parameters('imageName')]",
+              "resources": {
+                "requests": {
+                  "cpu": "[parameters('cpu')]",
+                  "memoryInGB": "[parameters('memory')]"
+                },
+                "limits": {
+                  "cpu": "[parameters('cpu')]",
+                  "memoryInGB": "[parameters('memory')]"
+                }
+              },
+              "environmentVariables": [
+                {
+                  "name": "ADMIN_USERNAME",
+                  "value": "[parameters('adminUsername')]"
+                },
+                {
+                  "name": "ADMIN_PASSWORD",
+                  "value": "[parameters('adminPassword')]"
+                },
+                {
+                  "name": "EULA",
+                  "value": "[string(parameters('eula'))]"
+                },
+                {
+                  "name": "DIFFICULTY",
+                  "value": "[parameters('difficulty')]"
+                },
+                {
+                  "name": "HARDCORE",
+                  "value": "[string(parameters('hardcore'))]"
+                },
+                {
+                  "name": "MAX_PLAYERS",
+                  "value": "[string(parameters('maxPlayers'))]"
+                },
+                {
+                  "name": "MAX_WORLD_RADIUS",
+                  "value": "[string(parameters('maxWorldRadius'))]"
+                },
+                {
+                  "name": "MOTD",
+                  "value": "[parameters('motd')]"
+                },
+                {
+                  "name": "PLAYER_IDLE_TIMEOUT",
+                  "value": "[string(parameters('playerIdleTimeout'))]"
+                },
+                {
+                  "name": "SERVER_IDLE_TIMEOUT",
+                  "value": "[string(parameters('serverIdleTimeout'))]"
+                },
+                {
+                  "name": "VIEW_DISTANCE",
+                  "value": "[string(parameters('viewDistance'))]"
+                },
+                {
+                  "name": "PVP",
+                  "value": "[string(parameters('pvp'))]"
+                }
+              ],
+              "ports": [
+                {
+                  "port": 80,
+                  "protocol": "TCP"
+                },
+                {
+                  "port": 25565,
+                  "protocol": "TCP"
+                }
+              ],
+              "volumeMounts": [
+                {
+                  "name": "world-data",
+                  "mountPath": "/data",
+                  "readOnly": false
+                }
+              ]
+            }
+          }
+        ],
+        "osType": "Linux",
+        "volumes": [
+          {
+            "name": "world-data",
+            "azureFile": {
+              "shareName": "world-data",
+              "storageAccountName": "[parameters('storageName')]",
+              "readOnly": false,
+              "storageAccountKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageName')), '2022-05-01').keys[0].value]"
+            }
+          }
+        ],
+        "restartPolicy": "Never",
+        "ipAddress": {
+          "ports": [
+            {
+              "port": 80,
+              "protocol": "TCP"
+            },
+            {
+              "port": 25565,
+              "protocol": "TCP"
+            }
+          ],
+          "type": "Public",
+          "autoGeneratedDomainNameLabelScope": "TenantReuse",
+          "dnsNameLabel": "[parameters('serverName')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/fileServices/shares', parameters('storageName'), 'default', 'world-data')]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "hostname": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerInstance/containerGroups', 'mc-container')).ipAddress.fqdn]"
+    }
+  }
+}

@@ -21,7 +21,7 @@ Admin panel is protected with login and password of your choice, to protect from
 
 ## Backup
 
-If you want to make a backup of your Minecraft world, you should backup `/server/world` directory, or mount it on an external volume.
+If you want to make a backup of your Minecraft world, you should backup `/data` directory, or mount it on an external volume.
 
 ## Available environment variables
 
