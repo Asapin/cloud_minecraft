@@ -183,7 +183,7 @@ fn recreate_symlinks() -> Result<(), std::io::Error> {
         if file_type.is_dir() {
             symlink_dir(&entry.path(), &counter_part)?;
         } else if file_type.is_file() {
-            symlink_file(&entry.path(), &counter_part)?;
+            symlink_file(&entry.path(), &counter_part);
         } else {
             warn!("{} is a symlink", &entry.path().to_string_lossy());
         }
@@ -192,23 +192,29 @@ fn recreate_symlinks() -> Result<(), std::io::Error> {
 }
 
 #[cfg(target_family = "unix")]
-fn symlink_file(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+fn symlink_file(original: &PathBuf, link: &str) {
     info!(
         "Linking files, from <{}> to <{}>",
         original.to_string_lossy(),
         link
     );
-    std::os::unix::fs::symlink(original, link)
+    match std::os::unix::fs::symlink(original, link) {
+        Ok(_r) => { },
+        Err(e) => warn!("Couldn't link file <{}>: {}", original.to_string_lossy(), &e)
+    }
 }
 
 #[cfg(target_family = "windows")]
-fn symlink_file(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+fn symlink_file(original: &PathBuf, link: &str) {
     info!(
         "Linking files, from <{}> to <{}>",
         original.to_string_lossy(),
         link
     );
-    std::os::windows::fs::symlink_file(original, link)
+    match std::os::windows::fs::symlink_file(original, link) {
+        Ok(_r) => { },
+        Err(e) => warn!("Skipping file <{}> because couldn't create link: {}", original.to_string_lossy(), &e)
+    }
 }
 
 #[cfg(target_family = "unix")]
@@ -243,6 +249,7 @@ fn backup_files() -> Result<(), std::io::Error> {
             || file_name == "fabric-server-launch.jar"
             || file_name == "admin_panel"
             || file_name == "logs"
+            || file_name == "server-icon.png"
         {
             continue;
         }
