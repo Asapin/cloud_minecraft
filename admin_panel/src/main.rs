@@ -269,10 +269,13 @@ fn start_server() -> Result<Child, std::io::Error> {
     info!("Starting Minecraft server...");
     Command::new("java")
         .arg("-Dlog4j2.formatMsgNoLookups=true")
+        .arg("-XX:MinRAMPercentage=50.0")
+        .arg("-XX:MaxRAMPercentage=90.0")
         .arg("-XX:+UseG1GC")
         .arg("-XX:+ParallelRefProcEnabled")
         .arg("-XX:MaxGCPauseMillis=200")
         .arg("-XX:+UnlockExperimentalVMOptions")
+        .arg("-XX:+PrintFlagsFinal")
         .arg("-XX:+DisableExplicitGC")
         .arg("-XX:+AlwaysPreTouch")
         .arg("-XX:G1NewSizePercent=30")
