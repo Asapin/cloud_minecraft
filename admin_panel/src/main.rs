@@ -246,7 +246,7 @@ fn backup_files() -> Result<(), std::io::Error> {
         let file_name = file_name.to_string_lossy();
         if file_name == "config"
             || file_name == "mods"
-            || file_name == "fabric-server-launch.jar"
+            || file_name == "fabric-server-launcher.jar"
             || file_name == "admin_panel"
             || file_name == "logs"
             || file_name == "server-icon.png"
@@ -291,7 +291,7 @@ fn start_server() -> Result<Child, std::io::Error> {
         .arg("-XX:+PerfDisableSharedMem")
         .arg("-XX:MaxTenuringThreshold=1")
         .arg("-jar")
-        .arg("fabric-server-launch.jar")
+        .arg("fabric-server-launcher.jar")
         .arg("nogui")
         .spawn()
 }
