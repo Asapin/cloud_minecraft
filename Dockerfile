@@ -9,7 +9,7 @@ COPY admin_panel .
 RUN cargo install --path .
 
 # Start Minecraft server
-FROM eclipse-temurin:18-jre-jammy
+FROM eclipse-temurin:19-jre-jammy
 
 WORKDIR /server
 VOLUME [ "/data" ]
