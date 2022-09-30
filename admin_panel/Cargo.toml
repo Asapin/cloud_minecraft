@@ -16,7 +16,7 @@ rand = { version = "0.8", default-features = false, features = ["std", "std_rng"
 thiserror = { version = "1", default-features = false }
 minecraft-client-rs = { version = "0.1", default-features = false }
 log = "^0"
-log4rs = { version = "^1", default-features = false, features = ["console_appender"] }
+log4rs = { version = "^1", default-features = false, features = ["console_appender", "file_appender"] }
 fs_extra = "1.2.0"
 
 [profile.release]

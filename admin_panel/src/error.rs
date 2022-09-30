@@ -21,6 +21,8 @@ pub enum LogInitError {
     Config(#[from] ConfigErrors),
     #[error("Couldn't create logger: {0}")]
     Create(#[from] SetLoggerError),
+    #[error("Couldn't initialize file appender")]
+    FileAppender(#[from] std::io::Error),
 }
 
 #[derive(Error, Debug)]
