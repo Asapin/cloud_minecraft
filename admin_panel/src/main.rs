@@ -115,8 +115,6 @@ async fn main() {
         .route("/kick", post(protected::kick_user))
         .route("/whitelist", post(protected::whitelist_add))
         .route("/whitelist", delete(protected::whitelist_remove))
-        .route("/generate", post(protected::generate_world))
-        .route("/generate", delete(protected::cancel_generation))
         .route("/ping", get(protected::server_status))
         .layer(CorsLayer::new().allow_origin(Any))
         .layer(Extension(context.clone()));
@@ -199,8 +197,12 @@ fn symlink_file(original: &PathBuf, link: &str) {
         link
     );
     match std::os::unix::fs::symlink(original, link) {
-        Ok(_r) => { },
-        Err(e) => warn!("Couldn't link file <{}>: {}", original.to_string_lossy(), &e)
+        Ok(_r) => {}
+        Err(e) => warn!(
+            "Couldn't link file <{}>: {}",
+            original.to_string_lossy(),
+            &e
+        ),
     }
 }
 
@@ -212,8 +214,12 @@ fn symlink_file(original: &PathBuf, link: &str) {
         link
     );
     match std::os::windows::fs::symlink_file(original, link) {
-        Ok(_r) => { },
-        Err(e) => warn!("Skipping file <{}> because couldn't create link: {}", original.to_string_lossy(), &e)
+        Ok(_r) => {}
+        Err(e) => warn!(
+            "Skipping file <{}> because couldn't create link: {}",
+            original.to_string_lossy(),
+            &e
+        ),
     }
 }
 

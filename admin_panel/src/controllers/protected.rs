@@ -74,25 +74,6 @@ pub async fn whitelist_remove(
     send_message(context, message).await
 }
 
-pub async fn generate_world(
-    Json(generate_world): Json<models::protected::GenerateWorld>,
-    Extension(context): Extension<Arc<Context>>,
-    _claims: Claims,
-) -> Result<Json<Value>, ProxyMessageError> {
-    let message = ProxyMessage::GenerateWorld {
-        radius: generate_world.radius,
-    };
-    send_message(context, message).await
-}
-
-pub async fn cancel_generation(
-    Extension(context): Extension<Arc<Context>>,
-    _claims: Claims,
-) -> Result<Json<Value>, ProxyMessageError> {
-    let message = ProxyMessage::CancelGeneration;
-    send_message(context, message).await
-}
-
 pub async fn server_status(
     Extension(context): Extension<Arc<Context>>,
     _claims: Claims,

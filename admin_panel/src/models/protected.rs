@@ -26,8 +26,3 @@ pub struct WhitelistAdd {
 pub struct WhitelistRemove {
     pub nickname: String,
 }
-
-#[derive(Deserialize)]
-pub struct GenerateWorld {
-    pub radius: u16,
-}

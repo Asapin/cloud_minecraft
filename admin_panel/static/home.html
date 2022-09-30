@@ -49,7 +49,6 @@
             <a href="#" data-form="banForm">Ban</a>
             <a href="#" data-form="kickForm">Kick</a>
             <a href="#" data-form="whitelistForm">Whitelist</a>
-            <a href="#" data-form="genForm">Pre-generate world</a>
         </nav>
         <div class="center">
             <div class="offsetLeft">
@@ -90,14 +89,6 @@
             </p>
             <button id="add">Add</button>
             <button id="remove">Remove</button>
-        </form>
-        <form id="genForm">
-            <p>
-                <label for="genRadius">Radius</label>
-                <input type="number" name="genRadius" id="genRadius" min="128" max="30000" value="128" required="required" />
-            </p>
-            <button id="generate">Start pre-generation</button>
-            <button id="cancel">Cancel</button>
         </form>
     </main>
     <script>
@@ -278,27 +269,6 @@
                 "nickname": nickname,
             });
             send("/whitelist", "DELETE", data, false);
-        });
-
-        $("#generate").on("click", function(event) {
-            if (!$("#genForm")[0].checkValidity()) {
-                return;
-            }
-            event.preventDefault();
-
-            let radius = parseInt($("#genRadius").val());
-            let data = JSON.stringify({
-                "radius": radius,
-            });
-            send("/generate", "POST", data, false);
-        });
-
-        $("#cancel").on("click", function(event) {
-            if (!$("#genForm")[0].checkValidity()) {
-                return;
-            }
-            event.preventDefault();
-            send("/generate", "DELETE", null, false);
         });
     </script>
 </body>

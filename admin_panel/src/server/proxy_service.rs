@@ -34,10 +34,6 @@ pub enum ProxyMessage {
     WhitelistRemove {
         nickname: String,
     },
-    GenerateWorld {
-        radius: u16,
-    },
-    CancelGeneration,
     Ping,
     Quit,
 }
@@ -122,8 +118,6 @@ impl ProxyService {
                         ProxyMessage::WhitelistRemove { nickname } => {
                             self.whitelist_remove(nickname)
                         }
-                        ProxyMessage::GenerateWorld { radius } => self.generate_world(radius),
-                        ProxyMessage::CancelGeneration => self.cancel_generation(),
                         ProxyMessage::Ping => Ok(self.current_online.to_string()),
                         ProxyMessage::Quit => {
                             warn!(
@@ -237,21 +231,6 @@ impl ProxyService {
 
     fn whitelist_remove(&mut self, nickname: String) -> Result<String, ProxyResponseError> {
         let command = format!("/whitelist remove {}", nickname);
-        self.send_command(command, true)
-    }
-
-    fn generate_world(&mut self, radius: u16) -> Result<String, ProxyResponseError> {
-        let command1 = format!("/chunky radius {}", radius);
-        let message1 = self.send_command(command1, true)?;
-
-        let command2 = "/chunky start".to_string();
-        let message2 = self.send_command(command2, false)?;
-
-        Ok(format!("{}\n{}", message1, message2))
-    }
-
-    fn cancel_generation(&mut self) -> Result<String, ProxyResponseError> {
-        let command = "/chunky cancel".to_string();
         self.send_command(command, true)
     }
 
