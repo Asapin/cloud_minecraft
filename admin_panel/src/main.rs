@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::ffi::OsString;
 use std::fs::read_dir;
 use std::path::PathBuf;
 use std::{env::VarError, net::SocketAddr, sync::Arc, time::Duration};
@@ -38,6 +40,14 @@ pub struct Context {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     logger::init_logger().expect("Couldn't create logger, shutting down...");
+
+    let existing_files = match folder_content("/server") {
+        Ok(content) => content,
+        Err(e) => {
+            error!("Couldn't read folder content: {}", &e);
+            return;
+        }
+    };
 
     match recreate_symlinks() {
         Ok(_r) => {}
@@ -146,7 +156,7 @@ async fn main() {
             // Move all files from `/server` to `/data` directory. Upon the next launch, the server will
             // create symlinks to these dirs and files, so from that point on Fabric and Minecraft server
             // will write to `/data` directory directly.
-            match backup_files() {
+            match backup_files(existing_files) {
                 Ok(_r) => {}
                 Err(e) => error!("Error while backuping server files: {}", &e),
             }
@@ -165,6 +175,17 @@ fn load_credentials() -> Result<(String, String), VarError> {
     let username = std::env::var("ADMIN_USERNAME")?;
     let password = std::env::var("ADMIN_PASSWORD")?;
     Ok((username, password))
+}
+
+fn folder_content(dir: &str) -> Result<HashSet<OsString>, std::io::Error> {
+    info!("Getting the content of {} folder", &dir);
+    let mut content = HashSet::new();
+    for path in read_dir(dir)? {
+        let entry = path?;
+        let file_name = entry.file_name();
+        content.insert(file_name);
+    }
+    Ok(content)
 }
 
 fn recreate_symlinks() -> Result<(), std::io::Error> {
@@ -243,20 +264,13 @@ fn symlink_dir(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
     std::os::windows::fs::symlink_dir(original, link)
 }
 
-fn backup_files() -> Result<(), std::io::Error> {
+fn backup_files(existing_files: HashSet<OsString>) -> Result<(), std::io::Error> {
     info!("Backing up server files...");
     let mut paths = Vec::new();
     for path in read_dir("/server")? {
         let entry = path?;
         let file_name = entry.file_name();
-        let file_name = file_name.to_string_lossy();
-        if file_name == "config"
-            || file_name == "mods"
-            || file_name == "fabric-server-launcher.jar"
-            || file_name == "admin_panel"
-            || file_name == "logs"
-            || file_name == "server-icon.png"
-        {
+        if existing_files.contains(&file_name) {
             continue;
         }
         let file_type = entry.file_type()?;
