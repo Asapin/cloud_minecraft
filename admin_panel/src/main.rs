@@ -1,7 +1,10 @@
 use std::collections::HashSet;
+use std::env::current_dir;
 use std::ffi::OsString;
 use std::fs::read_dir;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::Path;
+use std::process::Stdio;
 use std::{env::VarError, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::routing::delete;
@@ -40,16 +43,23 @@ pub struct Context {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     logger::init_logger().expect("Couldn't create logger, shutting down...");
+    let current_dir = match current_dir() {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Couldn't get current directory: {}", &e);
+            return;
+        }
+    };
 
-    let existing_files = match folder_content("/server") {
-        Ok(content) => content,
+    let existing_files = match folder_content(&current_dir) {
+        Ok(r) => r,
         Err(e) => {
             error!("Couldn't read folder content: {}", &e);
             return;
         }
     };
 
-    match recreate_symlinks() {
+    match recreate_symlinks(&current_dir) {
         Ok(_r) => {}
         Err(e) => {
             error!("Couldn't recreate symlinks: {}", &e);
@@ -83,7 +93,7 @@ async fn main() {
         }
     }
 
-    let mut server = match start_server() {
+    let server = match start_server() {
         Ok(server_process) => server_process,
         Err(e) => {
             error!("Couldn't start Minecraft server: {}", &e);
@@ -136,10 +146,13 @@ async fn main() {
             // If MC server has crashed, proxy service will not be able to detect it.
             // Instead, we can await on MC server's process directly, and manually stop
             // proxy service, in case of a crash.
-            match server.wait().await {
-                Ok(r) => info!("MC server exit code: {}", &r),
+            match server.wait_with_output().await {
+                Ok(r) => {
+                    info!("MC server exit code: {}", &r.status);
+                    save_output(&current_dir, "mc_error.log", r.stderr);
+                }
                 Err(e) => error!("Error while shutting down MC server: {}", &e),
-            }
+            };
             // During the normal operation, proxy service will close before MC server,
             // so attempting to send a message to it will return an error
             let (rx, _) = channel();
@@ -156,7 +169,7 @@ async fn main() {
             // Move all files from `/server` to `/data` directory. Upon the next launch, the server will
             // create symlinks to these dirs and files, so from that point on Fabric and Minecraft server
             // will write to `/data` directory directly.
-            match backup_files(existing_files) {
+            match backup_files(&current_dir, existing_files) {
                 Ok(_r) => {}
                 Err(e) => error!("Error while backuping server files: {}", &e),
             }
@@ -177,8 +190,8 @@ fn load_credentials() -> Result<(String, String), VarError> {
     Ok((username, password))
 }
 
-fn folder_content(dir: &str) -> Result<HashSet<OsString>, std::io::Error> {
-    info!("Getting the content of {} folder", &dir);
+fn folder_content(dir: &Path) -> Result<HashSet<OsString>, std::io::Error> {
+    info!("Getting the content of {} folder", &dir.to_string_lossy());
     let mut content = HashSet::new();
     for path in read_dir(dir)? {
         let entry = path?;
@@ -188,7 +201,7 @@ fn folder_content(dir: &str) -> Result<HashSet<OsString>, std::io::Error> {
     Ok(content)
 }
 
-fn recreate_symlinks() -> Result<(), std::io::Error> {
+fn recreate_symlinks(current_path: &Path) -> Result<(), std::io::Error> {
     info!("Recreating symlinks...");
     for path in read_dir("/data")? {
         let entry = path?;
@@ -198,7 +211,7 @@ fn recreate_symlinks() -> Result<(), std::io::Error> {
             continue;
         }
         let file_type = entry.file_type()?;
-        let counter_part = format!("/server/{}", &file_name);
+        let counter_part = current_path.join(&*file_name);
         if file_type.is_dir() {
             symlink_dir(&entry.path(), &counter_part)?;
         } else if file_type.is_file() {
@@ -211,16 +224,16 @@ fn recreate_symlinks() -> Result<(), std::io::Error> {
 }
 
 #[cfg(target_family = "unix")]
-fn symlink_file(original: &PathBuf, link: &str) {
+fn symlink_file(original: &Path, link: &Path) {
     info!(
-        "Linking files, from <{}> to <{}>",
+        "Linking file, from <{}> to <{}>",
         original.to_string_lossy(),
-        link
+        link.to_string_lossy()
     );
     match std::os::unix::fs::symlink(original, link) {
         Ok(_r) => {}
         Err(e) => warn!(
-            "Couldn't link file <{}>: {}",
+            "Skipping file <{}> because couldn't create link: {}",
             original.to_string_lossy(),
             &e
         ),
@@ -228,11 +241,11 @@ fn symlink_file(original: &PathBuf, link: &str) {
 }
 
 #[cfg(target_family = "windows")]
-fn symlink_file(original: &PathBuf, link: &str) {
+fn symlink_file(original: &Path, link: &Path) {
     info!(
-        "Linking files, from <{}> to <{}>",
+        "Linking file, from <{}> to <{}>",
         original.to_string_lossy(),
-        link
+        link.to_string_lossy()
     );
     match std::os::windows::fs::symlink_file(original, link) {
         Ok(_r) => {}
@@ -245,29 +258,32 @@ fn symlink_file(original: &PathBuf, link: &str) {
 }
 
 #[cfg(target_family = "unix")]
-fn symlink_dir(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+fn symlink_dir(original: &Path, link: &Path) -> Result<(), std::io::Error> {
     info!(
-        "Linking dirs, from <{}> to <{}>",
+        "Linking dir, from <{}> to <{}>",
         original.to_string_lossy(),
-        link
+        link.to_string_lossy()
     );
     std::os::unix::fs::symlink(original, link)
 }
 
 #[cfg(target_family = "windows")]
-fn symlink_dir(original: &PathBuf, link: &str) -> Result<(), std::io::Error> {
+fn symlink_dir(original: &Path, link: &Path) -> Result<(), std::io::Error> {
     info!(
-        "Linking dirs, from <{}> to <{}>",
+        "Linking dir, from <{}> to <{}>",
         original.to_string_lossy(),
-        link
+        link.to_string_lossy()
     );
     std::os::windows::fs::symlink_dir(original, link)
 }
 
-fn backup_files(existing_files: HashSet<OsString>) -> Result<(), std::io::Error> {
+fn backup_files(
+    current_path: &Path,
+    existing_files: HashSet<OsString>,
+) -> Result<(), std::io::Error> {
     info!("Backing up server files...");
     let mut paths = Vec::new();
-    for path in read_dir("/server")? {
+    for path in read_dir(&current_path)? {
         let entry = path?;
         let file_name = entry.file_name();
         if existing_files.contains(&file_name) {
@@ -283,6 +299,32 @@ fn backup_files(existing_files: HashSet<OsString>) -> Result<(), std::io::Error>
     fs_extra::move_items(&paths, "/data", &copy_options)
         .map(|_r| ())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+}
+
+fn save_output(current_path: &Path, log_path: &str, output: Vec<u8>) {
+    if output.is_empty() {
+        return;
+    }
+    let log = current_path.join(log_path);
+    let mut file = match std::fs::File::create(&log) {
+        Ok(f) => f,
+        Err(e) => {
+            error!(
+                "Couldn't create log file {}: {}",
+                &log.to_string_lossy(),
+                &e
+            );
+            return;
+        }
+    };
+    match writeln!(file, "{}", String::from_utf8_lossy(&output)) {
+        Ok(_r) => {}
+        Err(e) => error!(
+            "Couldn't save output into log file {}: {}",
+            &log.to_string_lossy(),
+            &e
+        ),
+    };
 }
 
 fn start_server() -> Result<Child, std::io::Error> {
@@ -313,5 +355,6 @@ fn start_server() -> Result<Child, std::io::Error> {
         .arg("-jar")
         .arg("fabric-server-launcher.jar")
         .arg("nogui")
+        .stderr(Stdio::piped())
         .spawn()
 }

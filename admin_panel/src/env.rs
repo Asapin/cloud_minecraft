@@ -106,7 +106,7 @@ impl Environment {
 
     pub fn eula_accepted(&self) -> bool {
         info!("Checking EULA...");
-        let eula_path = Path::new("/server/eula.txt");
+        let eula_path = Path::new("./eula.txt");
         if eula_path.exists() {
             return true;
         }
