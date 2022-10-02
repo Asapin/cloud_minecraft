@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::fs::read_dir;
 use std::io::Write;
 use std::path::Path;
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use std::{env::VarError, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::routing::delete;
@@ -147,10 +147,7 @@ async fn main() {
             // Instead, we can await on MC server's process directly, and manually stop
             // proxy service, in case of a crash.
             match server.wait_with_output().await {
-                Ok(r) => {
-                    info!("MC server exit code: {}", &r.status);
-                    save_output(&current_dir, "mc_error.log", r.stderr);
-                }
+                Ok(r) => save_output(&current_dir, "mc_error.log", r.status, r.stderr),
                 Err(e) => error!("Error while shutting down MC server: {}", &e),
             };
             // During the normal operation, proxy service will close before MC server,
@@ -301,7 +298,7 @@ fn backup_files(
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 }
 
-fn save_output(current_path: &Path, log_path: &str, output: Vec<u8>) {
+fn save_output(current_path: &Path, log_path: &str, exist_status: ExitStatus, output: Vec<u8>) {
     if output.is_empty() {
         return;
     }
@@ -317,6 +314,14 @@ fn save_output(current_path: &Path, log_path: &str, output: Vec<u8>) {
             return;
         }
     };
+    match writeln!(file, "{}", &exist_status) {
+        Ok(_r) => {}
+        Err(e) => error!(
+            "Couldn't write server's exist status into log file {}: {}",
+            &log.to_string_lossy(),
+            &e
+        ),
+    }
     match writeln!(file, "{}", String::from_utf8_lossy(&output)) {
         Ok(_r) => {}
         Err(e) => error!(
@@ -332,7 +337,7 @@ fn start_server() -> Result<Child, std::io::Error> {
     Command::new("java")
         .arg("-Dlog4j2.formatMsgNoLookups=true")
         .arg("-XX:MinRAMPercentage=50.0")
-        .arg("-XX:MaxRAMPercentage=90.0")
+        .arg("-XX:MaxRAMPercentage=95.0")
         .arg("-XX:+UseG1GC")
         .arg("-XX:+ParallelRefProcEnabled")
         .arg("-XX:MaxGCPauseMillis=200")
