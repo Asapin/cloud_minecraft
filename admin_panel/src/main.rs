@@ -357,6 +357,7 @@ fn start_server() -> Result<Child, std::io::Error> {
         .arg("-XX:SurvivorRatio=32")
         .arg("-XX:+PerfDisableSharedMem")
         .arg("-XX:MaxTenuringThreshold=1")
+        .arg("-XX:+HeapDumpOnOutOfMemoryError")
         .arg("-jar")
         .arg("fabric-server-launcher.jar")
         .arg("nogui")
