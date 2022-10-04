@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.10.61.36676",
-      "templateHash": "15706780664958398974"
+      "templateHash": "5838310446927363525"
     }
   },
   "parameters": {
@@ -32,7 +32,9 @@
       },
       "allowedValues": [
         "asapin/cloud_minecraft:1.19.2-fabric",
+        "asapin/cloud_minecraft:1.19.2-better-v7.5",
         "asapin/cloud_minecraft:1.19.2-better-v6",
+        "asapin/cloud_minecraft:1.19.2-medieval-v7",
         "asapin/cloud_minecraft:1.19.2-medieval-v6.5"
       ]
     },
