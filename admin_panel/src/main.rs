@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::env::current_dir;
 use std::ffi::OsString;
-use std::fs::read_dir;
+use std::fs::{self, read_dir};
 use std::io::Write;
 use std::path::Path;
 use std::process::{ExitStatus, Stdio};
@@ -288,6 +288,14 @@ fn backup_files(
         }
         let file_type = entry.file_type()?;
         if file_type.is_symlink() {
+            match fs::remove_file(entry.path()) {
+                Ok(_r) => {}
+                Err(e) => error!(
+                    "Couldn't delete symlink {}: {}",
+                    entry.path().to_string_lossy(),
+                    &e
+                ),
+            };
             continue;
         }
         paths.push(entry.path());
