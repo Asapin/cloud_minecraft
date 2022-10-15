@@ -74,6 +74,28 @@ pub async fn whitelist_remove(
     send_message(context, message).await
 }
 
+pub async fn op_add(
+    Json(op_add): Json<models::protected::OpAdd>,
+    Extension(context): Extension<Arc<Context>>,
+    _claims: Claims,
+) -> Result<Json<Value>, ProxyMessageError> {
+    let message = ProxyMessage::OpAdd {
+        nickname: op_add.nickname,
+    };
+    send_message(context, message).await
+}
+
+pub async fn de_op(
+    Json(de_op): Json<models::protected::DeOp>,
+    Extension(context): Extension<Arc<Context>>,
+    _claims: Claims,
+) -> Result<Json<Value>, ProxyMessageError> {
+    let message = ProxyMessage::DeOp {
+        nickname: de_op.nickname,
+    };
+    send_message(context, message).await
+}
+
 pub async fn server_status(
     Extension(context): Extension<Arc<Context>>,
     _claims: Claims,

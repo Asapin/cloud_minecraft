@@ -9,8 +9,10 @@ param serverName string
 
 @allowed([
   'asapin/cloud_minecraft:1.19.2-fabric'
+  'asapin/cloud_minecraft:1.19.2-better-v8.5'
   'asapin/cloud_minecraft:1.19.2-better-v7.5'
   'asapin/cloud_minecraft:1.19.2-better-v6'
+  'asapin/cloud_minecraft:1.19.2-medieval-v8.5'
   'asapin/cloud_minecraft:1.19.2-medieval-v7'
   'asapin/cloud_minecraft:1.19.2-medieval-v6.5'
 ])

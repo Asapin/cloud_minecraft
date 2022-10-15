@@ -135,6 +135,8 @@ async fn main() {
         .route("/kick", post(protected::kick_user))
         .route("/whitelist", post(protected::whitelist_add))
         .route("/whitelist", delete(protected::whitelist_remove))
+        .route("/op", post(protected::op_add))
+        .route("/op", delete(protected::de_op))
         .route("/ping", get(protected::server_status))
         .layer(CorsLayer::new().allow_origin(Any))
         .layer(Extension(context.clone()));

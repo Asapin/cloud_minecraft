@@ -26,3 +26,13 @@ pub struct WhitelistAdd {
 pub struct WhitelistRemove {
     pub nickname: String,
 }
+
+#[derive(Deserialize)]
+pub struct OpAdd {
+    pub nickname: String
+}
+
+#[derive(Deserialize)]
+pub struct DeOp {
+    pub nickname: String
+}

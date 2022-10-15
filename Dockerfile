@@ -1,5 +1,5 @@
 # Build admin panel
-FROM rust:1.63.0-slim-bullseye as builder
+FROM rust:1.64.0-slim-bullseye as builder
 WORKDIR /admin_panel
 
 # Copy source code

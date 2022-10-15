@@ -49,6 +49,7 @@
             <a href="#" data-form="banForm">Ban</a>
             <a href="#" data-form="kickForm">Kick</a>
             <a href="#" data-form="whitelistForm">Whitelist</a>
+            <a href="#" data-form="operatorForm">Operator</a>
         </nav>
         <div class="center">
             <div class="offsetLeft">
@@ -89,6 +90,14 @@
             </p>
             <button id="add">Add</button>
             <button id="remove">Remove</button>
+        </form>
+        <form id="operatorForm">
+            <p>
+                <label for="opNickname">Nickname</label>
+                <input type="text" name="opNickname" id="opNickname" placeholder="Nickname" required="required" />
+            </p>
+            <button id="op_add">Add</button>
+            <button id="de_op">Remove</button>
         </form>
     </main>
     <script>
@@ -170,7 +179,7 @@
             });
         }
 
-        let timer = setInterval(function() { send("/ping", "GET", null, true) }, 10000);
+        let timer = setInterval(function() { send("/ping", "GET", null, true) }, 7000);
 
         $("nav a").on("click", function() {
             $("nav a").each(function() {
@@ -269,6 +278,32 @@
                 "nickname": nickname,
             });
             send("/whitelist", "DELETE", data, false);
+        });
+
+        $("#op_add").on("click", function(event) {
+            if (!$("#operatorForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let nickname = $("#opNickname").val();
+            let data = JSON.stringify({
+                "nickname": nickname
+            });
+            send("/op", "POST", data, false);
+        });
+
+        $("#de_op").on("click", function(event) {
+            if (!$("#operatorForm")[0].checkValidity()) {
+                return;
+            }
+            event.preventDefault();
+
+            let nickname = $("#opNickname").val();
+            let data = JSON.stringify({
+                "nickname": nickname,
+            });
+            send("/op", "DELETE", data, false);
         });
     </script>
 </body>

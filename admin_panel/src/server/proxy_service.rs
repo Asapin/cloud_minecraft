@@ -34,6 +34,12 @@ pub enum ProxyMessage {
     WhitelistRemove {
         nickname: String,
     },
+    OpAdd {
+        nickname: String,
+    },
+    DeOp {
+        nickname: String,
+    },
     Ping,
     Quit,
 }
@@ -118,6 +124,8 @@ impl ProxyService {
                         ProxyMessage::WhitelistRemove { nickname } => {
                             self.whitelist_remove(nickname)
                         }
+                        ProxyMessage::OpAdd { nickname } => self.op_add(nickname),
+                        ProxyMessage::DeOp { nickname } => self.de_op(nickname),
                         ProxyMessage::Ping => Ok(self.current_online.to_string()),
                         ProxyMessage::Quit => {
                             warn!(
@@ -231,6 +239,16 @@ impl ProxyService {
 
     fn whitelist_remove(&mut self, nickname: String) -> Result<String, ProxyResponseError> {
         let command = format!("/whitelist remove {}", nickname);
+        self.send_command(command, true)
+    }
+
+    fn op_add(&mut self, nickname: String) -> Result<String, ProxyResponseError> {
+        let command = format!("/op {}", nickname);
+        self.send_command(command, true)
+    }
+
+    fn de_op(&mut self, nickname: String) -> Result<String, ProxyResponseError> {
+        let command = format!("/deop {}", nickname);
         self.send_command(command, true)
     }
 
