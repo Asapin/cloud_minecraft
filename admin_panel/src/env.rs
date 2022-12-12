@@ -113,7 +113,7 @@ impl Environment {
 
         if self.eula {
             info!("eula.txt doesn't exist, creating...");
-            match std::fs::write(&eula_path, "eula=true") {
+            match std::fs::write(eula_path, "eula=true") {
                 Ok(_r) => true,
                 Err(e) => {
                     error!("Couldn't create eula.txt: {}", &e);
@@ -136,7 +136,7 @@ impl Environment {
         }
 
         info!("server.properties doesn't exist, creating...");
-        let mut file = std::fs::File::create(&properties_path)?;
+        let mut file = std::fs::File::create(properties_path)?;
         writeln!(file, "{}", SERVER_PROPERTIES)?;
         writeln!(file, "difficulty={}", &self.difficulty)?;
         writeln!(file, "hardcore={}", &self.hardcore)?;

@@ -29,10 +29,10 @@ pub struct WhitelistRemove {
 
 #[derive(Deserialize)]
 pub struct OpAdd {
-    pub nickname: String
+    pub nickname: String,
 }
 
 #[derive(Deserialize)]
 pub struct DeOp {
-    pub nickname: String
+    pub nickname: String,
 }

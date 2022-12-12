@@ -282,7 +282,7 @@ fn backup_files(
 ) -> Result<(), std::io::Error> {
     info!("Backing up server files...");
     let mut paths = Vec::new();
-    for path in read_dir(&current_path)? {
+    for path in read_dir(current_path)? {
         let entry = path?;
         let file_name = entry.file_name();
         if existing_files.contains(&file_name) {
