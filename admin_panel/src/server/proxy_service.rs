@@ -187,6 +187,11 @@ impl ProxyService {
                             if time.elapsed() > self.idle_timeout {
                                 info!("The server is idle for too long");
                                 return Ok(());
+                            } else {
+                                info!(
+                                    "Server has been idle for {} seconds",
+                                    time.elapsed().as_secs()
+                                );
                             }
                         }
                         (ServerStatus::Idle(_), _) => self.status = ServerStatus::Busy,
