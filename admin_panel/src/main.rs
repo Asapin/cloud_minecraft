@@ -21,7 +21,8 @@ use server::online_poller::OnlinePoller;
 use server::proxy_service::{ProxyMessage, ProxyResponse, ProxyService};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot::{self, channel};
+use tokio::sync::oneshot;
+use tokio::time::{timeout_at, Instant};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::env::Environment;
@@ -145,26 +146,26 @@ async fn main() {
     let result = axum::Server::bind(&addr)
         .serve(router.into_make_service())
         .with_graceful_shutdown(async {
-            // If MC server has crashed, proxy service will not be able to detect it.
-            // Instead, we can await on MC server's process directly, and manually stop
-            // proxy service, in case of a crash.
-            match server.wait_with_output().await {
-                Ok(r) => save_output(&current_dir, "mc_error.log", r.status, r.stderr),
-                Err(e) => error!("Error while shutting down MC server: {}", &e),
-            };
-            // During the normal operation, proxy service will close before MC server,
-            // so attempting to send a message to it will return an error
-            let (rx, _) = channel();
-            match context.tx.send((ProxyMessage::Quit, rx)).await {
-                Ok(_r) => {}
-                Err(_e) => info!("Proxy is closed"),
-            }
             // If the server closed normally, proxy_task will return immediately.
-            // In case of MC server crash, await for proxy service to process `Quit` message
+            // In case MC server crashed, proxy will stop after `idle_timeout` minutes.
             match proxy_task.await {
                 Ok(_r) => {}
                 Err(e) => error!("Error while waiting for proxy layer to shutdown: {}", &e),
             };
+            // Wait for MC server to stop
+            let deadline = Instant::now() + idle_timeout;
+            match timeout_at(deadline, server.wait_with_output()).await {
+                Ok(r) => {
+                    match r {
+                        Ok(r) => save_output(&current_dir, "mc_error.log", r.status, r.stderr),
+                        Err(e) => error!(
+                            "Error while waiting for the server to shutdown: {}. Proceeding anyway",
+                            &e
+                        ),
+                    };
+                }
+                Err(_) => error!("Couldn't shutdown MC server in time. Proceeding anyway"),
+            }
             // Move all files from `/server` to `/data` directory. Upon the next launch, the server will
             // create symlinks to these dirs and files, so from that point on Fabric and Minecraft server
             // will write to `/data` directory directly.

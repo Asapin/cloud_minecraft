@@ -8,7 +8,7 @@ use tokio::{
         mpsc::{channel, Receiver, Sender},
         oneshot,
     },
-    time::{timeout_at, Instant},
+    time::{sleep, timeout_at, Instant},
 };
 
 use crate::error::ProxyResponseError;
@@ -41,7 +41,6 @@ pub enum ProxyMessage {
         nickname: String,
     },
     Ping,
-    Quit,
 }
 
 #[derive(Debug, Serialize)]
@@ -52,7 +51,7 @@ pub enum ProxyResponse {
 }
 
 enum ServerStatus {
-    Starting,
+    Starting(Instant),
     Idle(Instant),
     Busy,
 }
@@ -71,7 +70,8 @@ impl ProxyService {
         online_poller: OnlinePoller,
         idle_timeout: Duration,
     ) -> (Self, Sender<(ProxyMessage, oneshot::Sender<ProxyResponse>)>) {
-        let status = ServerStatus::Starting;
+        let start_time = Instant::now();
+        let status = ServerStatus::Starting(start_time);
         let (tx, rx) = channel(16);
         (
             Self {
@@ -80,7 +80,7 @@ impl ProxyService {
                 idle_timeout,
                 rx,
                 current_online: 0,
-                last_request_time: Instant::now(),
+                last_request_time: start_time,
             },
             tx,
         )
@@ -91,11 +91,14 @@ impl ProxyService {
             Ok(_r) => {}
             Err(e) => error!("Proxy service encountered an error: {}", &e),
         };
-        info!("Shutting down MC server...");
-        match self.shutdown().await {
-            Ok(_r) => {}
-            Err(e) => error!("Error while shutting down MC server: {}", &e),
-        };
+        info!("Sending shut down command to MC server...");
+        for _ in 0..3 {
+            if (self.shutdown().await).is_ok() {
+                break;
+            }
+            error!("Error while shutting down MC server, attempting again in 5 seconds...");
+            sleep(Duration::from_secs(5)).await;
+        }
     }
 
     async fn do_run(&mut self) -> Result<(), ProxyResponseError> {
@@ -111,7 +114,7 @@ impl ProxyService {
                         None => return Err(ProxyResponseError::IncomingChannelClosed),
                     };
                     info!("Received new message: {:?}", &message);
-                    if matches!(&self.status, ServerStatus::Starting) {
+                    if matches!(&self.status, ServerStatus::Starting(_)) {
                         warn!("Server is not ready yet...");
                         rx.send(ProxyResponse::NotReady)?;
                         continue;
@@ -127,12 +130,6 @@ impl ProxyService {
                         ProxyMessage::OpAdd { nickname } => self.op_add(nickname),
                         ProxyMessage::DeOp { nickname } => self.de_op(nickname),
                         ProxyMessage::Ping => Ok(self.current_online.to_string()),
-                        ProxyMessage::Quit => {
-                            warn!(
-                                "MC server closed before proxy server. Possible MC server crash?"
-                            );
-                            return Ok(());
-                        }
                     };
 
                     match response {
@@ -160,19 +157,35 @@ impl ProxyService {
                 }
                 Err(_e) => {
                     deadline = Instant::now() + frequency;
-                    debug!("Timeouted, polling MC server...");
+                    debug!("Timed out, polling MC server...");
                     let polling_result = self.online_poller.current_online().await;
                     self.current_online = match polling_result {
                         Ok(number_of_players) => number_of_players,
-                        Err(e) => {
-                            warn!("Error while trying to load current online: {}", &e);
+                        Err(_) => {
+                            match &self.status {
+                                ServerStatus::Starting(time) => {
+                                    if time.elapsed() > self.idle_timeout {
+                                        warn!("The server took too long to start");
+                                        return Ok(());
+                                    }
+                                }
+                                ServerStatus::Idle(time) => {
+                                    if time.elapsed() > self.idle_timeout {
+                                        info!("The server has been idle for too long");
+                                        return Ok(());
+                                    }
+                                }
+                                ServerStatus::Busy => {
+                                    self.status = ServerStatus::Idle(Instant::now());
+                                }
+                            }
                             continue;
                         }
                     };
 
                     debug!("Current online: {}", &self.current_online);
                     match (&self.status, self.current_online) {
-                        (ServerStatus::Starting, number) => {
+                        (ServerStatus::Starting(_), number) => {
                             self.status = {
                                 info!("MC server is ready...");
                                 if number == 0 {
@@ -185,7 +198,7 @@ impl ProxyService {
                         (ServerStatus::Busy, 0) => self.status = ServerStatus::Idle(Instant::now()),
                         (ServerStatus::Idle(time), 0) => {
                             if time.elapsed() > self.idle_timeout {
-                                info!("The server is idle for too long");
+                                info!("The server has been idle for too long");
                                 return Ok(());
                             } else {
                                 info!(
@@ -202,7 +215,7 @@ impl ProxyService {
         }
     }
 
-    async fn shutdown(mut self) -> Result<(), ProxyResponseError> {
+    async fn shutdown(&mut self) -> Result<(), ProxyResponseError> {
         let command = "/stop".to_string();
         let _ = self.send_command(command, false)?;
         Ok(())
