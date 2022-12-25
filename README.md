@@ -2,7 +2,7 @@
 
 This is a Minecraft server packed as a Docker image. This project is inspired by [Minecraft on demand](https://github.com/doctorray117/minecraft-ondemand) from doctorray117, but simplifies the process for the end user by providing a simple admin panel, that will automatically shut down the server when it's idle for too long.
 
-In theory, admin panel can be used with any Minecraft server, but it does assume, that the server has "Chunky" mod installed and `fabric-server-launch.jar` is available.
+In theory, admin panel can be used with any Minecraft server, but it does assume that `fabric-server-launch.jar` is available.
 
 ## Exposed ports
 
@@ -13,7 +13,7 @@ This image exposes the following ports:
 
 ## Admin panel
 
-This docker container includes a simple admin panel, that allows you to ban/unban players, kick players off the server, add/remove players from the whitelist and start/cancel world pre-generation. It also shows current server status and the number of players on the server. The admin panel will also validate server settings, as well as keep track of the number of players online, and will shutdown the server if it's been idle for too long.
+This docker container includes a simple admin panel, that allows you to ban/unban players, kick players off the server, add/remove players from the whitelist and add/remove operator privileges. It also shows current server status and the number of players on the server. The admin panel will also validate server settings, as well as keep track of the number of players online, and will shutdown the server if it's been idle for too long.
 
 When starting Minecraft server, it will use [Aikar's flags](https://aikar.co/2018/07/02/tuning-the-jvm-g1gc-garbage-collector-flags-for-minecraft/).
 
